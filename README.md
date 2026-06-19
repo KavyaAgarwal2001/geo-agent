@@ -3,16 +3,17 @@
 Live earth-science data, in two shapes: a tool for AI agents, and an app for humans.
 
 - 🔗 **Live demo:** https://kavyaagarwal-geo-agent.streamlit.app
-- 🔧 **MCP server:** exposes the same data as tools for any [MCP](https://modelcontextprotocol.io)-compatible AI client (Claude Desktop, Cursor, etc.)
+- 🔧 **MCP server:** exposes the same data as tools for any [MCP](https://modelcontextprotocol.io) compatible AI client (Claude Desktop, Cursor, etc.)
+- 📝 **Writeup:** https://kavya855084.substack.com/p/building-geo-agent-an-mcp-server
 
 ## What this is
 
-This project exposes earth-science data through two interfaces, because they solve different problems.
+This project exposes earth-science data through multiple interfaces, because they solve different problems.
 
 - **The Streamlit app** is for humans. Open it, click around, look at charts and maps.
-- **The MCP server** is for agents. It lets an AI assistant decide, on its own, to pull live data as one step while reasoning about something else entirely. No dashboard required, no human has to know this tool exists.
+- **The MCP server** is for agents. It lets an AI assistant decide, on its own, to pull live data or search reference material as one step while reasoning about something else entirely.
 
-Started with earthquakes (USGS), now also covers climate data (NASA POWER). More tools in progress.
+Started with live earthquake and climate data (USGS, NASA POWER), connected to Claude Desktop to confirm agentic tool use, and is now adding retrieval over real climate science literature.
 
 ## Components
 
@@ -30,19 +31,30 @@ uv run mcp dev server.py
 Opens the MCP Inspector in your browser for testing tools directly.
 
 ### 2. Live web app (`app.py`)
-Two tabs, same underlying data sources, built for human exploration:
-- **Earthquakes**: live filtering by magnitude and time window, a magnitude reference guide, an interactive map, and a raw data table.
-- **Climate**: pick a location (presets or custom coordinates), see temperature, precipitation, and solar radiation as time series, plus a location map. Same -999 fill-value handling as the MCP tool.
+Two tabs, same underlying data sources, built for human exploration: an interactive earthquake map and a climate time-series explorer, both with live filtering.
 
 ```bash
 uv run streamlit run app.py
 ```
 
+### 3. Climate paper search (in progress)
+A local retrieval-augmented search system over real climate science reports (IPCC AR6, SR15), so questions can be answered with grounded, cited passages instead of relying on a model's training data alone.
+
+- `ingest.py`: extracts text from PDFs in `papers/`, splits it into overlapping chunks, embeds them with `sentence-transformers` (`all-MiniLM-L6-v2`), and stores them in a local [Chroma](https://www.trychroma.com) vector database.
+- `tests/test_retrieval.py`: a pytest suite validating retrieval quality across multiple real climate questions, not just a single spot-checked query.
+
+```bash
+uv run python ingest.py
+uv run pytest tests/test_retrieval.py -v
+```
+
+An MCP tool wrapping this search (`search_climate_papers`) is the next step, not yet wired into `server.py`.
+
 ## Tech stack
-Python, MCP SDK, Streamlit, Plotly, httpx, uv
+Python, MCP SDK, Streamlit, Plotly, httpx, Chroma, sentence-transformers, pytest, uv
 
 ## Status
-See commit history for progress. Next up: a historical weather tool, then connecting this server to an MCP client (Claude Desktop) so an agent can choose between tools live, on its own.
+See commit history for progress. Currently building: an MCP tool exposing climate-paper search, then a router agent that decides which of the available tools (live data vs. paper search) to use for a given question.
 
 ## Author
 Kavya Agarwal. [Website](https://kavyaagarwal2001.github.io) · [LinkedIn](https://in.linkedin.com/in/kavya-agarwal-5a77611a4)
