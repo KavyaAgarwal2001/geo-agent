@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta
 from mcp.server.fastmcp import FastMCP
 import httpx
+import chromadb
+from chromadb.utils import embedding_functions
 
 mcp = FastMCP("geo-agent")
 
@@ -10,6 +12,15 @@ READ_ONLY = {
     "idempotentHint": True,
     "openWorldHint": True,
 }
+
+# Loaded once at server startup, not per-call, since loading the embedding
+# model takes a few seconds and the server stays running between tool calls.
+CHROMA_PATH = "./chroma_db"
+_embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
+    model_name="all-MiniLM-L6-v2"
+)
+_chroma_client = chromadb.PersistentClient(path=CHROMA_PATH)
+
 
 @mcp.tool(annotations=READ_ONLY)
 async def get_recent_earthquakes(min_magnitude: float = 4.5, days: int = 7) -> str:
@@ -79,7 +90,42 @@ async def get_climate_point_data(latitude: float, longitude: float, days: int = 
         solar = param_data["ALLSKY_SFC_SW_DWN"][d]
         solar_str = "not yet available" if solar == -999.0 else f"{solar} kWh/m²/day"
         lines.append(f"- {d}: {temp}°C avg temp, {precip} mm/day precip, {solar_str} solar radiation")
-        #lines.append(f"- {d}: {temp}°C avg temp, {precip} mm/day precip, {solar} kWh/m²/day solar radiation")
+    return "\n".join(lines)
+
+
+@mcp.tool(annotations=READ_ONLY)
+def search_climate_papers(query: str, n_results: int = 3) -> str:
+    """Search real climate science reports (IPCC AR6, SR15) for passages relevant to a question.
+    Returns the most relevant passages with their source document and page number,
+    so answers can be grounded in real citations instead of relying on training data alone.
+
+    Args:
+        query: the question or topic to search for
+        n_results: how many passages to return (default 3, max 10)
+    """
+    try:
+        collection = _chroma_client.get_collection(
+            name="climate_papers", embedding_function=_embedding_fn
+        )
+    except Exception:
+        return (
+            "No climate paper index found. Add PDFs to papers/ and run "
+            "`uv run python ingest.py` first."
+        )
+
+    n_results = max(1, min(n_results, 10))
+    results = collection.query(query_texts=[query], n_results=n_results)
+
+    docs = results["documents"][0]
+    metas = results["metadatas"][0]
+
+    if not docs:
+        return f"No relevant passages found for: {query}"
+
+    lines = [f"Top {len(docs)} passages for: {query}\n"]
+    for doc, meta in zip(docs, metas):
+        snippet = doc.strip().replace("\n", " ")
+        lines.append(f"[{meta['source']}, page {meta['page']}]\n{snippet}\n")
     return "\n".join(lines)
 
 
