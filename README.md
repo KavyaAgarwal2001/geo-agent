@@ -9,7 +9,7 @@ Live earth-science data, in two shapes: a tool for AI agents, and an app for hum
 
 This project exposes earth-science data through two interfaces, because they solve different problems.
 
-- **The Streamlit app** is for humans. Open it, drag sliders, look at a map.
+- **The Streamlit app** is for humans. Open it, click around, look at charts and maps.
 - **The MCP server** is for agents. It lets an AI assistant decide, on its own, to pull live data as one step while reasoning about something else entirely. No dashboard required, no human has to know this tool exists.
 
 Started with earthquakes (USGS), now also covers climate data (NASA POWER). More tools in progress.
@@ -30,7 +30,9 @@ uv run mcp dev server.py
 Opens the MCP Inspector in your browser for testing tools directly.
 
 ### 2. Live web app (`app.py`)
-Interactive earthquake explorer, using the same USGS data, built for human exploration: live filtering by magnitude and time window, a magnitude reference guide, and a raw data table.
+Two tabs, same underlying data sources, built for human exploration:
+- **Earthquakes**: live filtering by magnitude and time window, a magnitude reference guide, an interactive map, and a raw data table.
+- **Climate**: pick a location (presets or custom coordinates), see temperature, precipitation, and solar radiation as time series, plus a location map. Same -999 fill-value handling as the MCP tool.
 
 ```bash
 uv run streamlit run app.py
