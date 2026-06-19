@@ -1,25 +1,46 @@
 # geo-agent
 
-An MCP server that gives AI agents access to live earth-science data — earthquakes, climate, and weather — through the [Model Context Protocol](https://modelcontextprotocol.io).
+Live earth-science data, in two shapes: a tool for AI agents, and an app for humans.
 
-## Why
+🔗 **Live demo:** https://kavyaagarwal-geo-agent.streamlit.app
+🔧 **MCP server:** exposes the same data as tools for any [MCP](https://modelcontextprotocol.io)-compatible AI client (Claude Desktop, Cursor, etc.)
 
-Most AI agents can talk *about* the world but can't see what's happening in it right now. This server exposes real, current geophysical data as tools any MCP-compatible client (Claude Desktop, Cursor, etc.) can call directly.
+## What this is
 
-## Tools
+Most "AI + data" projects pick one interface. This one deliberately builds two, on the same underlying data logic, because they solve different problems.
 
-- `get_recent_earthquakes(min_magnitude, days)` — recent significant earthquakes worldwide, via USGS
+- **The Streamlit app** is for humans. Open it, drag sliders, look at a map.
+- **The MCP server** is for agents. It lets an AI assistant decide, on its own, to pull live earthquake data as one step while reasoning about something else entirely. No dashboard required, no human has to know this tool exists.
 
-More tools (climate point data, historical weather) coming as this project grows. See commit history for progress.
+Starting with earthquakes (USGS), growing to cover climate and weather data next.
 
-## Running it
+## Components
+
+### 1. MCP server (`server.py`)
+Exposes earth-science data as tools any MCP client can call.
+
+**Tools:**
+- `get_recent_earthquakes(min_magnitude, days)`: recent significant earthquakes worldwide, via [USGS](https://earthquake.usgs.gov). Read-only, annotated.
 
 ```bash
 uv sync
 uv run mcp dev server.py
 ```
-This opens the MCP Inspector for testing tools directly in the browser.
+Opens the MCP Inspector in your browser for testing tools directly.
+
+### 2. Live web app (`app.py`)
+Interactive earthquake explorer, using the same USGS data, built for human exploration: live filtering by magnitude and time window, a magnitude reference guide, and a raw data table.
+
+```bash
+uv run streamlit run app.py
+```
+Or just visit the live deployed version: https://kavyaagarwal-geo-agent.streamlit.app
+
+## Tech stack
+Python, MCP SDK, Streamlit, Plotly, httpx, uv
 
 ## Status
+Early and being built in public. See commit history for progress. Next up: a climate/weather data tool (NASA POWER), then a router agent that reasons across live data, research literature, and forecasting models.
 
-Early and actively being built in public. Part of a larger project to build an agent that reasons across live data, research literature, and forecasting models.
+## Author
+Kavya Agarwal. [Website](https://kavyaagarwal2001.github.io) · [LinkedIn](https://in.linkedin.com/in/kavya-agarwal-5a77611a4)
