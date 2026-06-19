@@ -5,6 +5,8 @@ import httpx
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import chromadb
+from chromadb.utils import embedding_functions
 
 st.set_page_config(page_title="Geo Agent Explorer", page_icon="🌍", layout="wide")
 st.title("Geo agent explorer")
@@ -15,13 +17,13 @@ with st.sidebar:
     with st.expander("Why does this exist alongside an MCP server?"):
         st.write(
             "This app is for humans: open it, click around, look at charts. "
-            "The same data-fetching logic also powers an MCP server tool, which lets AI agents "
-            "(Claude Desktop, etc.) pull this same live data autonomously, as one step in reasoning "
-            "about something else, no dashboard required. "
+            "The same data-fetching and retrieval logic also powers an MCP server with three tools, which "
+            "lets AI agents (Claude Desktop, etc.) pull this same data and search autonomously, as one step "
+            "in reasoning about something else, no dashboard required. "
             "[See the MCP server on GitHub](https://github.com/KavyaAgarwal2001/geo-agent)."
         )
 
-tab1, tab2 = st.tabs(["🌍 Earthquakes", "🌡️ Climate"])
+tab1, tab2, tab3 = st.tabs(["🌍 Earthquakes", "🌡️ Climate", "📚 Paper Search"])
 
 # ---------------- Earthquakes tab ----------------
 with tab1:
@@ -203,3 +205,56 @@ with tab2:
             "Solar (kWh/m²/day)": solar,
         })
         st.dataframe(df, use_container_width=True, hide_index=True)
+
+# ---------------- Paper Search tab ----------------
+with tab3:
+    st.caption(
+        "Semantic search over real climate science reports (IPCC AR6, SR15), the exact same "
+        "retrieval logic the MCP tool `search_climate_papers` uses."
+    )
+
+    # st.cache_resource, not st.cache_data, since we're caching a live model and DB
+    # connection (stateful objects), not serializable data like a DataFrame. cache_data
+    # would try to copy/pickle these on every access, which doesn't work for ML models;
+    # cache_resource keeps one shared instance alive across reruns instead.
+    @st.cache_resource
+    def load_paper_index():
+        embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
+            model_name="all-MiniLM-L6-v2"
+        )
+        client = chromadb.PersistentClient(path="./chroma_db")
+        try:
+            return client.get_collection(name="climate_papers", embedding_function=embedding_fn)
+        except Exception:
+            return None
+
+    with st.spinner("Loading paper search index..."):
+        collection = load_paper_index()
+
+    if collection is None:
+        st.warning(
+            "No paper index found yet. Add PDFs to `papers/` and run "
+            "`uv run python ingest.py` to build the search index."
+        )
+    else:
+        query = st.text_input(
+            "Ask a question about climate science",
+            placeholder="e.g. What adaptation strategies are recommended for coastal cities?",
+        )
+        n_results = st.slider("Number of passages", 1, 10, 3, key="paper_n_results")
+
+        if st.button("Search", type="primary") and query:
+            with st.spinner("Searching climate papers..."):
+                results = collection.query(query_texts=[query], n_results=n_results)
+
+            docs = results["documents"][0]
+            metas = results["metadatas"][0]
+
+            if not docs:
+                st.info("No relevant passages found.")
+            else:
+                st.caption(f"Top {len(docs)} passages, via local semantic search, no internet search involved")
+                for doc, meta in zip(docs, metas):
+                    with st.container(border=True):
+                        st.markdown(f"**{meta['source']}, page {meta['page']}**")
+                        st.write(doc.strip())
